@@ -1,27 +1,22 @@
 import os
 import telebot
-import yt_dlp
+import random
 from flask import Flask, request
 from dotenv import load_dotenv
 import threading
-import time
 
 load_dotenv()
 
-# Bot tokenini oling
-TOKEN = "8366478184:AAGP8zLve0yfm3ABggvKjHvZmcSDkQt4ehQ"
+# Bot tokeni (Siz bergan token)
+TOKEN = os.environ.get("BOT_TOKEN", "8366478184:AAGP8zLve0yfm3ABggvKjHvZmcSDkQt4ehQ")
 bot = telebot.TeleBot(TOKEN)
 
-# Flask serverni sozlash (Koyeb uchun)
+# Flask server (Koyeb 24/7 uchun)
 app = Flask(__name__)
-
-# Vaqtinchalik fayllar uchun papka
-if not os.path.exists('downloads'):
-    os.makedirs('downloads')
 
 @app.route('/')
 def home():
-    return "Bot is running 24/7!", 200
+    return "KAI Bot is running 24/7!", 200
 
 @app.route(f'/{TOKEN}', methods=['POST'])
 def getMessage():
@@ -30,97 +25,66 @@ def getMessage():
     bot.process_new_updates([update])
     return "!", 200
 
-@bot.message_handler(commands=['start', 'help'])
-def send_welcome(message):
-    bot.reply_to(message, "Salom! Menga Instagram yoki YouTube linkini yuboring, men uni yuklab beraman.\n\nAgar faqat musiqasini xohlasangiz, linkdan keyin 'audio' so'zini yozing.\n\nEslatma: Instagram videolarini yuklashda muammo bo'lsa, menga 'cookies.txt' faylini yuboring.")
+# 1. Yangi a'zolarni kutib olish
+@bot.message_handler(content_types=['new_chat_members'])
+def welcome_new_member(message):
+    for new_member in message.new_chat_members:
+        first_name = new_member.first_name
+        group_name = message.chat.title
+        
+        # Ramazon tabrigi bilan kutib olish
+        welcome_text = (f"Salom {first_name}! 👋\n"
+                        f"'{group_name}' guruhiga xush kelibsiz!\n"
+                        f"Yaqinlashib kelayotgan Ramazon oyingiz muborak bo'lsin! ✨")
+        bot.reply_to(message, welcome_text)
 
-@bot.message_handler(content_types=['document'])
-def handle_docs(message):
-    if message.document.file_name == 'cookies.txt':
-        file_info = bot.get_file(message.document.file_id)
-        downloaded_file = bot.download_file(file_info.file_path)
-        with open('cookies.txt', 'wb') as new_file:
-            new_file.write(downloaded_file)
-        bot.reply_to(message, "Cookies fayli qabul qilindi va yangilandi!")
-
-def download_media(url, is_audio=False):
-    # Cookies fayli mavjudligini tekshirish
-    cookies_path = 'cookies.txt'
-    
-    ydl_opts = {
-        'format': 'best' if not is_audio else 'bestaudio/best',
-        'outtmpl': 'downloads/%(title)s.%(ext)s',
-        'quiet': True,
-        'no_warnings': True,
-        'merge_output_format': 'mp4' if not is_audio else None,
-        'no_check_certificate': True,
-        'add_header': [
-            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36'
-        ]
-    }
-    
-    # Agar cookies fayli bo'lsa, uni ishlatish
-    if os.path.exists(cookies_path):
-        ydl_opts['cookiefile'] = cookies_path
-    
-    if is_audio:
-        ydl_opts['postprocessors'] = [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }]
-
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        # Instagram uchun ba'zan bir necha marta urinish kerak bo'lishi mumkin
-        info = ydl.extract_info(url, download=True)
-        filename = ydl.prepare_filename(info)
-        if is_audio:
-            filename = os.path.splitext(filename)[0] + '.mp3'
-        return filename
-
-@bot.message_handler(func=lambda message: True)
-def handle_message(message):
-    url = message.text.strip()
-    is_audio = 'audio' in url.lower()
-    if is_audio:
-        url = url.lower().replace('audio', '').strip()
-
-    if not (url.startswith('http://') or url.startswith('https://')):
-        bot.reply_to(message, "Iltimos, to'g'ri link yuboring.")
+# 2. "кай инфа" buyrug'i (tasodifiy foizlar)
+@bot.message_handler(func=lambda message: message.text and message.text.lower().startswith("кай инфа"))
+def kai_info(message):
+    # Savolni ajratib olish
+    question = message.text.lower().replace("кай инфа", "").strip()
+    if not question:
+        bot.reply_to(message, "Iltimos, savol bering. Masalan: 'кай инфа do'stim ahmoq'")
         return
-
-    msg = bot.reply_to(message, "Yuklanmoqda... Iltimos kuting.")
+        
+    percentage = random.randint(0, 100)
     
-    try:
-        file_path = download_media(url, is_audio)
+    # Turli xil javob variantlari
+    responses = [
+        f"Menimcha, bu {percentage}% haqiqat.",
+        f"Aniq ayta olaman: {percentage}%!",
+        f"Mening hisob-kitoblarim bo'yicha: {percentage}%",
+        f"Bunga ishonish qiyin, lekin: {percentage}%",
+        f"Siz so'radingiz, men javob beraman: {percentage}%"
+    ]
+    
+    bot.reply_to(message, random.choice(responses))
+
+# 3. Aqlli suhbatdosh (Oddiy savol-javoblar)
+@bot.message_handler(func=lambda message: message.text and not message.text.startswith("/"))
+def chat_logic(message):
+    text = message.text.lower()
+    
+    # Oddiy suhbat mantiqi
+    if any(word in text for word in ["salom", "qalaysan", "nima gap"]):
+        responses = ["Salom! Men KAI botman. Guruhda zerikmaysiz degan umiddaman!", "Vaalaykum salom! Kayfiyatlar qalay?", "Salom! Men suhbatga tayyorman."]
+        bot.reply_to(message, random.choice(responses))
         
-        with open(file_path, 'rb') as f:
-            if is_audio:
-                bot.send_audio(message.chat.id, f)
-            else:
-                bot.send_video(message.chat.id, f)
-        
-        # Faylni o'chirish
-        os.remove(file_path)
-        bot.delete_message(message.chat.id, msg.message_id)
-        
-    except Exception as e:
-        bot.edit_message_text(f"Xatolik yuz berdi: {str(e)}", message.chat.id, msg.message_id)
+    elif any(word in text for word in ["kim", "botsan", "nima bu"]):
+        bot.reply_to(message, "Men KAI — guruhlar uchun aqlli va ko'ngilochar botman. Menga 'кай инфа [savol]' deb yozishingiz mumkin.")
+
+    elif "ramazon" in text:
+        bot.reply_to(message, "Ramazon — baraka va rahmat oyi. Barchamizga muborak bo'lsin! 🌙")
 
 def run_flask():
-    # Koyeb PORT muhit o'zgaruvchisini beradi
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port)
 
 if __name__ == "__main__":
-    # Webhookni sozlash (Keyinchalik Koyeb URL'ini qo'yish kerak bo'ladi)
-    # Hozircha polling bilan ishga tushiramiz, lekin hostingda webhook afzal
-    # Koyeb uchun: bot.remove_webhook()
-    # bot.set_webhook(url=f"https://your-app-name.koyeb.app/{TOKEN}")
-    
-    # Flaskni alohida thread'da ishga tushirish (24/7 saqlash uchun)
+    # Flaskni alohida thread'da ishga tushirish
     t = threading.Thread(target=run_flask)
     t.start()
     
-    # Pollingni ishga tushirish
+    # Botni ishga tushirish
+    print("KAI bot ishga tushdi...")
     bot.infinity_polling()
