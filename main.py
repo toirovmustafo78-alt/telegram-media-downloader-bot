@@ -32,16 +32,36 @@ def getMessage():
 
 @bot.message_handler(commands=['start', 'help'])
 def send_welcome(message):
-    bot.reply_to(message, "Salom! Menga Instagram yoki YouTube linkini yuboring, men uni yuklab beraman.\n\nAgar faqat musiqasini xohlasangiz, linkdan keyin 'audio' so'zini yozing.")
+    bot.reply_to(message, "Salom! Menga Instagram yoki YouTube linkini yuboring, men uni yuklab beraman.\n\nAgar faqat musiqasini xohlasangiz, linkdan keyin 'audio' so'zini yozing.\n\nEslatma: Instagram videolarini yuklashda muammo bo'lsa, menga 'cookies.txt' faylini yuboring.")
+
+@bot.message_handler(content_types=['document'])
+def handle_docs(message):
+    if message.document.file_name == 'cookies.txt':
+        file_info = bot.get_file(message.document.file_id)
+        downloaded_file = bot.download_file(file_info.file_path)
+        with open('cookies.txt', 'wb') as new_file:
+            new_file.write(downloaded_file)
+        bot.reply_to(message, "Cookies fayli qabul qilindi va yangilandi!")
 
 def download_media(url, is_audio=False):
+    # Cookies fayli mavjudligini tekshirish
+    cookies_path = 'cookies.txt'
+    
     ydl_opts = {
         'format': 'best' if not is_audio else 'bestaudio/best',
         'outtmpl': 'downloads/%(title)s.%(ext)s',
         'quiet': True,
         'no_warnings': True,
         'merge_output_format': 'mp4' if not is_audio else None,
+        'no_check_certificate': True,
+        'add_header': [
+            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36'
+        ]
     }
+    
+    # Agar cookies fayli bo'lsa, uni ishlatish
+    if os.path.exists(cookies_path):
+        ydl_opts['cookiefile'] = cookies_path
     
     if is_audio:
         ydl_opts['postprocessors'] = [{
@@ -51,6 +71,7 @@ def download_media(url, is_audio=False):
         }]
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        # Instagram uchun ba'zan bir necha marta urinish kerak bo'lishi mumkin
         info = ydl.extract_info(url, download=True)
         filename = ydl.prepare_filename(info)
         if is_audio:
