@@ -36,10 +36,11 @@ def send_welcome(message):
 
 def download_media(url, is_audio=False):
     ydl_opts = {
-        'format': 'bestaudio/best' if is_audio else 'bestvideo+bestaudio/best',
+        'format': 'best' if not is_audio else 'bestaudio/best',
         'outtmpl': 'downloads/%(title)s.%(ext)s',
         'quiet': True,
         'no_warnings': True,
+        'merge_output_format': 'mp4' if not is_audio else None,
     }
     
     if is_audio:
